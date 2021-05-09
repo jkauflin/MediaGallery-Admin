@@ -1,0 +1,16 @@
+{
+  "name": "mediagallery-admin",
+  "version": "1.0.0",
+  "description": "Admin utilities for MediaGallery like FTP and create thumbnails",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "John Kauflin",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "latest",
+    "ftp": "^0.3.10",
+    "node-datetime": "latest"
+  }
+}
