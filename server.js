@@ -45,7 +45,7 @@ var walkSync = function (dir, filelist) {
     return filelist;
 };
 
-var fileList = walkSync(process.env.PHOTOS_DIR);
+//var fileList = walkSync(process.env.PHOTOS_DIR);
 
 /*
 for (var i = 0, len = fl.length; i < len; i++) {
@@ -55,19 +55,7 @@ for (var i = 0, len = fl.length; i < len; i++) {
 
 var backSlashRegExp = new RegExp("\\\\", "g");
 
-
 var ftpClient = new ftp();
-ftpClient.on('ready', function() {
-    console.log("connected");
-        /*
-        c.put('foo.txt', 'foo.remote-copy.txt', function(err) {
-            if (err) throw err;
-            c.end();
-        });
-        */
-     
-});
-
 ftpClient.connect({
     host: process.env.FTP_HOST,
     port: process.env.FTP_PORT,
@@ -75,9 +63,26 @@ ftpClient.connect({
     password: process.env.FTP_PASS
 });
 
+ftpClient.on('ready', function () {
+    console.log("connected");
+
+    ftpClient.list(process.env.REMOTE_PATH, false, function (error, dirlist) {
+        console.log("dirlist len = " + dirlist.length);
+        dirlist.forEach(function (dl) {
+            console.log("name = " + dl.name);
+        });
+    });
+
+    ftpClient.put('foo.txt', process.env.REMOTE_PATH+'foo.txt', function (err) {
+        if (err) throw err;
+        ftpClient.end();
+    });
+
+});
+
 
 // Start recursive function
-createThumbnail(0);
+//createThumbnail(0);
 
 function createThumbnail(index) {
     var fileNameAndPath = fileList[index].substring(3).replace(backSlashRegExp, "/");
@@ -89,14 +94,6 @@ function createThumbnail(index) {
 
     // Test FTP functions
 
-    ftpClient.list(process.env.REMOTE_PATH,false, function(error,dirlist) {
-        console.log("dirlist len = "+dirlist.length);
-
-        dirlist.forEach(function(dl) {
-            console.log("name = "+dl.name);
-        });
-
-    });
 
     /*
     https.get(tempUrl, (resp) => {
