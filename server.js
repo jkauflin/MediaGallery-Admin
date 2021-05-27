@@ -9,6 +9,7 @@ Modification History
                 which takes "subPath" as a parameter
 2021-05-09 JJK  Re-factored for MediaGallery-Admin
                 Working on FTP functions
+2021-05-23 JJK  
 =============================================================================*/
 
 // General handler for any uncaught exceptions
@@ -45,13 +46,10 @@ var walkSync = function (dir, filelist) {
     return filelist;
 };
 
-//var fileList = walkSync(process.env.PHOTOS_DIR);
-
-/*
-for (var i = 0, len = fl.length; i < len; i++) {
-    console.log("fl[" + i + "] = " + fl[i]);
+var fileList = walkSync(process.env.PHOTOS_DIR+process.env.PHOTOS_DIR);
+for (var i = 0, len = fileList.length; i < len; i++) {
+    console.log("fileList[" + i + "] = " + fileList[i]);
 }
-*/
 
 var backSlashRegExp = new RegExp("\\\\", "g");
 
@@ -66,6 +64,7 @@ ftpClient.connect({
 ftpClient.on('ready', function () {
     console.log("connected");
 
+    /*
     ftpClient.list(process.env.REMOTE_PATH, false, function (error, dirlist) {
         console.log("dirlist len = " + dirlist.length);
         dirlist.forEach(function (dl) {
@@ -77,6 +76,7 @@ ftpClient.on('ready', function () {
         if (err) throw err;
         ftpClient.end();
     });
+    */
 
 });
 
@@ -93,7 +93,6 @@ function createThumbnail(index) {
     console.log("tempUrl = " + tempUrl);
 
     // Test FTP functions
-
 
     /*
     https.get(tempUrl, (resp) => {
