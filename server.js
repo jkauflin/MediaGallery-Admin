@@ -9,7 +9,8 @@ Modification History
                 which takes "subPath" as a parameter
 2021-05-09 JJK  Re-factored for MediaGallery-Admin
                 Working on FTP functions
-2021-05-23 JJK  
+2021-05-27 JJK  Re-worked the file loop to get list of only image files
+                without the LOCAL ROOT
 =============================================================================*/
 
 // General handler for any uncaught exceptions
@@ -26,32 +27,44 @@ require('dotenv').config();
 const https = require('https');
 var dateTime = require('node-datetime');
 var ftp = require('ftp');
-var fs = require('fs');
 
 // List all files in a directory in Node.js recursively in a synchronous fashion
+//var path = require('path');
+var fs = require('fs');
+var filepath = '';
+var extension = '';
 var walkSync = function (dir, filelist) {
-    var path = path || require('path');
-    var fs = fs || require('fs'),
+    //var path = path || require('path');
+    //var fs = fs || require('fs'),
     files = fs.readdirSync(dir);
     filelist = filelist || [];
     files.forEach(function (file) {
-        if (fs.statSync(path.join(dir, file)).isDirectory()) {
-            filelist = walkSync(path.join(dir, file), filelist);
+        filepath = dir+'/'+file;
+        //if (fs.statSync(path.join(dir, file)).isDirectory()) {
+        if (fs.statSync(filepath).isDirectory()) {
+            //filelist = walkSync(path.join(dir, file), filelist);
+            filelist = walkSync(filepath, filelist);
         }
         else {
-            // check for image file first???
-            filelist.push(path.join(dir, file));
+            //console.log('dir = '+dir+", replace = "+dir.replace(process.env.LOCAL_PHOTOS_ROOT,''));
+            // dir minus the LOCAL ROOT            
+            //console.log('file = '+file);
+            //filelist.push(path.join(dir, file));
+
+            // Only add support file types to the list
+            extension = file.substring(file.lastIndexOf(".")+1).toUpperCase();
+            if (extension == "JPEG" || extension == "JPG" || extension == "PNG" || extension == "GIF") {
+                // Add the path minus the LOCAL ROOT
+                filelist.push(dir.replace(process.env.LOCAL_PHOTOS_ROOT,'')+'/'+file);
+            }
         }
     });
     return filelist;
 };
-
-var fileList = walkSync(process.env.PHOTOS_DIR+process.env.PHOTOS_DIR);
-for (var i = 0, len = fileList.length; i < len; i++) {
-    console.log("fileList[" + i + "] = " + fileList[i]);
-}
-
-var backSlashRegExp = new RegExp("\\\\", "g");
+var fileList = walkSync(process.env.LOCAL_PHOTOS_ROOT+process.env.PHOTOS_DIR);
+//for (var i = 0, len = fileList.length; i < len; i++) {
+//    console.log("fileList[" + i + "] = " + fileList[i]);
+//}
 
 var ftpClient = new ftp();
 ftpClient.connect({
@@ -60,9 +73,11 @@ ftpClient.connect({
     user: process.env.FTP_USER,
     password: process.env.FTP_PASS
 });
-
 ftpClient.on('ready', function () {
-    console.log("connected");
+    console.log("FTP connected");
+
+    // Start recursive function
+    createThumbnail(0);
 
     /*
     ftpClient.list(process.env.REMOTE_PATH, false, function (error, dirlist) {
@@ -80,21 +95,25 @@ ftpClient.on('ready', function () {
 
 });
 
+ftpClient.on('end', function () {
+    console.log("FTP ended");
+});
 
 // Start recursive function
 //createThumbnail(0);
-
+//var backSlashRegExp = new RegExp("\\\\", "g");
 function createThumbnail(index) {
-    var fileNameAndPath = fileList[index].substring(3).replace(backSlashRegExp, "/");
-    var tempStr = fileNameAndPath.replace("jjkPhotos", "Photos");
-    fileNameAndPath = tempStr;
+    //var fileNameAndPath = fileList[index].substring(3).replace(backSlashRegExp, "/");
+    var fileNameAndPath = fileList[index];
+    //console.log("fileNameAndPath = " + fileNameAndPath);
+
+    //var tempStr = fileNameAndPath.replace("jjkPhotos", "Photos");
+    //fileNameAndPath = tempStr;
     var tempUrl = process.env.WEB_ROOT_URL + '/vendor/jkauflin/jjkgallery/createThumbnail.php?filePath=' + fileNameAndPath;
-    
-    console.log("tempUrl = " + tempUrl);
+    //console.log("tempUrl = " + tempUrl);
 
     // Test FTP functions
 
-    /*
     https.get(tempUrl, (resp) => {
         let data = '';
         // A chunk of data has been recieved.
@@ -106,13 +125,16 @@ function createThumbnail(index) {
             //console.log("data = " + data);
             // Maybe return if it created one or not?  and do less time if not created
             console.log(dateTime.create().format('Y-m-d H:M:S ') + index + " of " + fileList.length + ", " + fileNameAndPath + ", " + data);
-            var delayMs = 50;
+            var delayMs = 20;
             if (data == 'Created') {
-                delayMs = 100;
+                delayMs = 50;
             }
             if (index < fileList.length - 1) {
                 setTimeout(createThumbnail, delayMs, index + 1);
+            } else {
+                ftpClient.end();
             }
+
         });
     }).on("error", (e) => {
         console.log("Error: " + e.message);
@@ -120,7 +142,6 @@ function createThumbnail(index) {
         setTimeout(createThumbnail, 3000, index);
         //Error: connect ETIMEDOUT 173.205.127.190:443
     });
-    */
 
 } // function createThumbnail(fileNameAndPath) {
 
