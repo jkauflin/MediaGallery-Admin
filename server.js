@@ -58,6 +58,7 @@ var fileList = walkSync(process.env.LOCAL_PHOTOS_ROOT+process.env.PHOTOS_START_D
 //    console.log("fileList[" + i + "] = " + fileList[i]);
 //}
 
+var startTime = '';
 var ftpClient = new ftp();
 ftpClient.connect({
     host: process.env.FTP_HOST,
@@ -66,12 +67,13 @@ ftpClient.connect({
     password: process.env.FTP_PASS
 });
 ftpClient.on('ready', function () {
-    console.log("FTP connected");
+    startTime = dateTime.create().format('Y-m-d H:M:S ');
+    console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP connected, start dir = " + process.env.PHOTOS_START_DIR);
     // After the FTP connection is made, start recursive function
     transferFile(0);
 });
 ftpClient.on('end', function () {
-    console.log("FTP ended");
+    console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP ended, start time = "+startTime);
 });
 
 var tempStr = '';
@@ -103,7 +105,10 @@ function transferFile(index) {
         } else {
             //console.log("lastModified = "+lastModified);
             // lastModified = Sat Apr 10 2021 12:54:30 GMT-0400 (Eastern Daylight Time)
-            console.log(dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index] + ", Exists");
+            
+            // >>>>> Uncomment if you want to see progress
+            //console.log(dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index] + ", Exists");
+            
             // if File found, just proceed to the next file
             if (index < fileList.length - 1) {
                 // Proceed to the next file after a short delay
