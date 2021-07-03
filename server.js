@@ -12,6 +12,7 @@ Modification History
 2021-05-27 JJK  Re-worked the file loop to get list of only image files
                 without the LOCAL ROOT
 2021-05-28 JJK  Completed new FTP and create thumbnail logic
+2021-07-03 JJK  Added logic to create the remote directory if missing
 =============================================================================*/
 
 // General handler for any uncaught exceptions
@@ -80,29 +81,58 @@ var tempStr = '';
 function transferFile(index) {
     var localFileNameAndPath = process.env.LOCAL_PHOTOS_ROOT + fileList[index];
     var fileNameAndPath = process.env.REMOTE_PHOTOS_ROOT + fileList[index];
-    //console.log(dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index]);
+    //console.log(">>> "+dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index]);
 
-    // Test FTP functions
+    // First try to get the last modified information for the file
     ftpClient.lastMod(fileNameAndPath, function (error, lastModified) {
         if (error) {
             //console.log("err in lastMod, err = "+error);
+            // If there was an error, see if it is because of No file or directory
             tempStr = String(error);
             if (tempStr.indexOf('No such file or directory') !== -1) {
+                // If No file or directory, try a PUT of the file
                 ftpClient.put(localFileNameAndPath, fileNameAndPath, function (err2) {
                     if (err2) {
-                        ftpClient.end();
-                        throw err2;
+                        // Check if the PUT error was because of No directory
+                        tempStr = String(err2);
+                        if (tempStr.indexOf('No such file or directory') !== -1) {
+                            // If PUT error was because of No file or directory, try creating the directory and re-try the file transfer
+                            tempStr = fileNameAndPath.substring(0, fileNameAndPath.lastIndexOf("/"));
+                            ftpClient.mkdir(tempStr, function (err3) {
+                                if (err3) {
+                                    console.log("Error in mkdir, directory = "+tempStr);
+                                    console.log("err3 = "+err3);
+                                    ftpClient.end();
+                                    throw err2;
+                                }
+
+                                console.log("Directory created, dir = "+tempStr);
+                                // If the create dir was successful, re-try the transfer
+                                //console.log(">>> calling the transferFile, index = "+index);
+                                setTimeout(transferFile, 10, index);
+                            });
+
+                        } else {
+                            // Some other error
+                            console.log("Some other error in PUT besides No file or directory, err2 = "+err2);
+                            ftpClient.end();
+                            throw err2;
+                        }
+                    } else {
+                        // If the FTP PUT was successful, do the create thumbnail and go to next file
+                        console.log(dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index] + ", Transferred");
+                        // Proceed to creating the thumbnail after a small delay
+                        setTimeout(createThumbnail, 10, index);
                     }
-                    console.log(dateTime.create().format('Y-m-d H:M:S ') + (index+1) + " of " + fileList.length + ", " + fileList[index] + ", Transferred");
-                    // If FTP PUT was successful, create the Thumbnail
-                    // Proceed to creating the thumbnail after a small delay
-                    setTimeout(createThumbnail, 10, index);
                 });
+
             } else {
+                console.log("Some other ERROR in get Last Modified besides No file or directory, err = "+error);
                 ftpClient.end();
                 throw error;
             }
         } else {
+            // If get of Last Modified was success, then the file was already there (transferred and assume thumbnails created)
             //console.log("lastModified = "+lastModified);
             // lastModified = Sat Apr 10 2021 12:54:30 GMT-0400 (Eastern Daylight Time)
             
