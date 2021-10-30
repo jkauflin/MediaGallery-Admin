@@ -13,6 +13,8 @@ Modification History
                 without the LOCAL ROOT
 2021-05-28 JJK  Completed new FTP and create thumbnail logic
 2021-07-03 JJK  Added logic to create the remote directory if missing
+2021-10-30 JJK  Modified to save a last completed timestamp and look for
+                files with a timestamp greater than last run
 =============================================================================*/
 
 // General handler for any uncaught exceptions
@@ -34,30 +36,55 @@ var ftp = require('ftp');
 var fs = require('fs');
 var filepath = '';
 var extension = '';
+var fileInfo = null;
+const lastRunFilename = 'lastRunTimestamp.log';
+var lastRunTimestamp = new Date('May 27, 95 00:00:00 GMT-0400');
+
 var walkSync = function (dir, filelist) {
-    files = fs.readdirSync(dir);
+    //files = fs.readdirSync(dir);
+    files = fs.readdirSync(dir,['utf8','true']);
     filelist = filelist || [];
     files.forEach(function (file) {
         filepath = dir+'/'+file;
-        if (fs.statSync(filepath).isDirectory()) {
+        fileInfo = fs.statSync(filepath);
+
+        if (fileInfo.isDirectory()) {
             filelist = walkSync(filepath, filelist);
         }
         else {
             // Only add support file types to the list
             extension = file.substring(file.lastIndexOf(".")+1).toUpperCase();
             if (extension == "JPEG" || extension == "JPG" || extension == "PNG" || extension == "GIF") {
-                // Add the path minus the LOCAL ROOT
-                filelist.push(dir.replace(process.env.LOCAL_PHOTOS_ROOT,'')+'/'+file);
+
+                // File Last Modified
+                // fileInfo.mtime = Sat Oct 30 2021 09:50:11 GMT-0400 (Eastern Daylight Time)
+                //console.log("fileInfo.mtime = "+fileInfo.mtime+", "+lastRunTimestamp);
+                //console.log("fileInfo.mtime = "+fileInfo.mtime.getTime()+", "+lastRunTimestamp.getTime());
+
+                if (fileInfo.mtime.getTime() > lastRunTimestamp.getTime()) {
+                    // Add the path minus the LOCAL ROOT
+                    //console.log("Adding file = "+file);
+                    filelist.push(dir.replace(process.env.LOCAL_PHOTOS_ROOT,'')+'/'+file);
+                }
             }
         }
     });
     return filelist;
 };
-// Start the walkSync to load all the files into the filelist array
-var fileList = walkSync(process.env.LOCAL_PHOTOS_ROOT+process.env.PHOTOS_START_DIR);
-//for (var i = 0, len = fileList.length; i < len; i++) {
-//    console.log("fileList[" + i + "] = " + fileList[i]);
-//}
+
+var fileList = null;
+fs.readFile(lastRunFilename, function(err, buf) {
+    if (!err) {
+        lastRunTimestamp = new Date (buf.toString());
+    }
+    console.log("Last Run Timestamp = "+lastRunTimestamp);
+    // Start the walkSync to load all the files into the filelist array
+    fileList = walkSync(process.env.LOCAL_PHOTOS_ROOT+process.env.PHOTOS_START_DIR);
+    //for (var i = 0, len = fileList.length; i < len; i++) {
+    //    console.log("fileList[" + i + "] = " + fileList[i]);
+    //}
+});
+
 
 var startTime = '';
 var ftpClient = new ftp();
@@ -75,6 +102,12 @@ ftpClient.on('ready', function () {
 });
 ftpClient.on('end', function () {
     console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP ended, start time = "+startTime);
+    var outTimestamp = new Date();
+    //fs.writeFile(lastRunFilename, outTimestamp.getTime(), (err) => {
+    fs.writeFile(lastRunFilename, outTimestamp, (err) => {
+    if (err) console.log(err);
+        //console.log("Successfully Written to File.");
+    });
 });
 
 var tempStr = '';
