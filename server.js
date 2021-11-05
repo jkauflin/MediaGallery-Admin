@@ -58,10 +58,14 @@ var walkSync = function (dir, filelist) {
 
                 // File Last Modified
                 // fileInfo.mtime = Sat Oct 30 2021 09:50:11 GMT-0400 (Eastern Daylight Time)
+                //console.log(filepath);
                 //console.log("fileInfo.mtime = "+fileInfo.mtime+", "+lastRunTimestamp);
-                //console.log("fileInfo.mtime = "+fileInfo.mtime.getTime()+", "+lastRunTimestamp.getTime());
+                //console.log("fileInfo.ctime = "+fileInfo.ctime);
+                //console.log("fileInfo.atime = "+fileInfo.atime);
 
-                if (fileInfo.mtime.getTime() > lastRunTimestamp.getTime()) {
+                // Add to the list if the Created or Modified time is greater than the last run time
+                if (fileInfo.ctime.getTime() > lastRunTimestamp.getTime() ||
+                    fileInfo.mtime.getTime() > lastRunTimestamp.getTime()) {
                     // Add the path minus the LOCAL ROOT
                     //console.log("Adding file = "+file);
                     filelist.push(dir.replace(process.env.LOCAL_PHOTOS_ROOT,'')+'/'+file);
