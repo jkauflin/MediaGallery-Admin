@@ -40,6 +40,7 @@ var fileInfo = null;
 const lastRunFilename = 'lastRunTimestamp.log';
 var lastRunTimestamp = new Date('May 27, 95 00:00:00 GMT-0400');
 
+
 var walkSync = function (dir, filelist) {
     //files = fs.readdirSync(dir);
     files = fs.readdirSync(dir,['utf8','true']);
@@ -82,37 +83,57 @@ fs.readFile(lastRunFilename, function(err, buf) {
         lastRunTimestamp = new Date (buf.toString());
     }
     console.log("Last Run Timestamp = "+lastRunTimestamp);
+
+    if (process.env.LAST_RUN_TIMESTAMP_OVERRIDE != undefined) {
+        console.log("LAST_RUN_TIMESTAMP_OVERRIDE = "+process.env.LAST_RUN_TIMESTAMP_OVERRIDE);
+        lastRunTimestamp = new Date(process.env.LAST_RUN_TIMESTAMP_OVERRIDE);
+        console.log("Last Run Timestamp = "+lastRunTimestamp);
+    }
     // Start the walkSync to load all the files into the filelist array
+
     fileList = walkSync(process.env.LOCAL_PHOTOS_ROOT+process.env.PHOTOS_START_DIR);
     //for (var i = 0, len = fileList.length; i < len; i++) {
     //    console.log("fileList[" + i + "] = " + fileList[i]);
     //}
+    if (fileList.length > 0) {
+        // start transfer
+        startTransfer();
+    } else {
+        console.log("No new pictures found");
+        console.log("");
+    }
 });
 
-
+var reconnect = false;
 var startTime = '';
 var ftpClient = new ftp();
-ftpClient.connect({
-    host: process.env.FTP_HOST,
-    port: process.env.FTP_PORT,
-    user: process.env.FTP_USER,
-    password: process.env.FTP_PASS
-});
-ftpClient.on('ready', function () {
-    startTime = dateTime.create().format('Y-m-d H:M:S ');
-    console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP connected, start dir = " + process.env.PHOTOS_START_DIR);
-    // After the FTP connection is made, start recursive function
-    transferFile(0);
-});
-ftpClient.on('end', function () {
-    console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP ended, start time = "+startTime);
-    var outTimestamp = new Date();
-    //fs.writeFile(lastRunFilename, outTimestamp.getTime(), (err) => {
-    fs.writeFile(lastRunFilename, outTimestamp, (err) => {
-    if (err) console.log(err);
-        //console.log("Successfully Written to File.");
+var startTransfer = function () {
+    console.log(">>> in the startTransfer function");
+    ftpClient.connect({
+        host: process.env.FTP_HOST,
+        port: process.env.FTP_PORT,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS
     });
-});
+    ftpClient.on('ready', function () {
+        startTime = dateTime.create().format('Y-m-d H:M:S ');
+        console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP connected, start dir = " + process.env.PHOTOS_START_DIR);
+        // After the FTP connection is made, start recursive function
+        if (!reconnect) {
+            transferFile(0);
+        }
+    });
+    ftpClient.on('end', function () {
+        console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP ended, start time = "+startTime);
+        var outTimestamp = new Date();
+        //fs.writeFile(lastRunFilename, outTimestamp.getTime(), (err) => {
+        fs.writeFile(lastRunFilename, outTimestamp, (err) => {
+        if (err) console.log(err);
+            //console.log("Successfully Written to File.");
+        });
+    });
+};
+
 
 var tempStr = '';
 function transferFile(index) {
@@ -153,6 +174,29 @@ function transferFile(index) {
                             // Some other error
                             console.log("Some other error in PUT besides No file or directory, err2 = "+err2);
                             ftpClient.end();
+
+                            /*
+                            reconnect = true;
+                            console.log(">>>>> Re-connecting2... ");
+
+                            ftpClient.connect({
+                                host: process.env.FTP_HOST,
+                                port: process.env.FTP_PORT,
+                                user: process.env.FTP_USER,
+                                password: process.env.FTP_PASS
+                            });
+
+                            // If reconnect was successful (check in future), re-start the transfer
+                            //console.log(">>> calling the transferFile, index = "+index);
+                            setTimeout(transferFile, 3000, index);
+                            */
+
+/*&
+                            Some other error in PUT besides No file or directory, err2 = Error: write ECONNRESET
+>>>>> Re-connecting2... 
+2021-12-28 19:10:02 FTP ended, start time = 2021-12-28 19:02:57 
+2021-12-28 19:10:02 FTP ended, start time = 2021-12-28 19:02:57 
+*/
                             throw err2;
                         }
                     } else {
@@ -166,7 +210,42 @@ function transferFile(index) {
             } else {
                 console.log("Some other ERROR in get Last Modified besides No file or directory, err = "+error);
                 ftpClient.end();
+                /*
+2021-12-28 16:50:05 FTP connected, start dir = Photos/1 John J Kauflin/2016-to-2022/2021
+2021-12-28 16:50:34 320 of 1210, Photos/1 John J Kauflin/2016-to-2022/2021/03 Summer/20210613_001246240_iOS.jpg, Transferred
+2021-12-28 16:50:35 320 of 1210, Photos/1 John J Kauflin/2016-to-2022/2021/03 Summer/20210613_001246240_iOS.jpg, Thumbnail Created
+...
+2021-12-28 17:00:03 427 of 1210, Photos/1 John J Kauflin/2016-to-2022/2021/03 Summer/20210703_182345012_iOS.jpg, Transferred
+2021-12-28 17:00:05 427 of 1210, Photos/1 John J Kauflin/2016-to-2022/2021/03 Summer/20210703_182345012_iOS.jpg, Thumbnail Created
+
+Some other error in PUT besides No file or directory, err2 = Error: read ECONNRESET
+UncaughtException, error = Error: read ECONNRESET
+Error: read ECONNRESET
+    at TCP.onStreamRead (internal/stream_base_commons.js:111:27)
+
+>>> probably lost connection after 10 minutes
+>>> re-connect and try again
+                */
+
+/*
+                reconnect = true;
+                console.log(">>>>> Re-connecting... ");
+
+                ftpClient.connect({
+                    host: process.env.FTP_HOST,
+                    port: process.env.FTP_PORT,
+                    user: process.env.FTP_USER,
+                    password: process.env.FTP_PASS
+                });
+
+                // If reconnect was successful (check in future), re-start the transfer
+                //console.log(">>> calling the transferFile, index = "+index);
+                setTimeout(transferFile, 3000, index);
+*/
+
+                // else throw error
                 throw error;
+
             }
         } else {
             // If get of Last Modified was success, then the file was already there (transferred and assume thumbnails created)
