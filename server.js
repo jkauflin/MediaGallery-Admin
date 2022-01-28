@@ -109,6 +109,7 @@ var startTime = '';
 var ftpClient = new ftp();
 var startTransfer = function () {
     console.log(">>> in the startTransfer function");
+
     ftpClient.connect({
         host: process.env.FTP_HOST,
         port: process.env.FTP_PORT,
@@ -127,7 +128,7 @@ var startTransfer = function () {
         console.log(dateTime.create().format('Y-m-d H:M:S ') + "FTP ended, start time = "+startTime);
         var outTimestamp = new Date();
         //fs.writeFile(lastRunFilename, outTimestamp.getTime(), (err) => {
-        fs.writeFile(lastRunFilename, outTimestamp, (err) => {
+        fs.writeFile(lastRunFilename, outTimestamp.toString(), (err) => {
         if (err) console.log(err);
             //console.log("Successfully Written to File.");
         });
